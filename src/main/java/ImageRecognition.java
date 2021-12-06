@@ -1,14 +1,18 @@
+import org.openimaj.data.dataset.VFSListDataset;
 import org.openimaj.image.DisplayUtilities;
-import org.openimaj.image.MBFImage;
-import org.openimaj.image.colour.ColourSpace;
-import org.openimaj.image.colour.RGBColour;
-import org.openimaj.image.typography.hershey.HersheyFont;
+import org.openimaj.image.FImage;
+import org.openimaj.image.ImageUtilities;
+
+import java.nio.file.Paths;
 
 public class ImageRecognition {
     public static void main(String[] args) {
-        MBFImage image = new MBFImage(400,70, ColourSpace.RGB);
-        image.fill(RGBColour.WHITE);
-        image.drawText("Hello Budapest!", 10, 60, HersheyFont.CURSIVE, 50, RGBColour.BLACK);
-        DisplayUtilities.display(image);
+        try {
+            VFSListDataset<FImage> testing = new VFSListDataset<>("zip:" + Paths.get("").toAbsolutePath() + "\\images\\testing.zip", ImageUtilities.FIMAGE_READER);
+            VFSListDataset<FImage> training = new VFSListDataset<>("zip:" + Paths.get("").toAbsolutePath() + "\\images\\training.zip", ImageUtilities.FIMAGE_READER);
+            DisplayUtilities.display("Testing", testing);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
