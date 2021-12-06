@@ -5,23 +5,38 @@ import org.openimaj.data.dataset.ListDataset;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
 import org.openimaj.experiment.dataset.sampling.GroupedUniformRandomisedSampler;
-import org.openimaj.feature.DoubleFV;
-import org.openimaj.feature.FeatureExtractor;
-import org.openimaj.feature.SparseIntFV;
+import org.openimaj.feature.*;
 import org.openimaj.feature.local.data.LocalFeatureListDataSource;
 import org.openimaj.feature.local.list.LocalFeatureList;
 import org.openimaj.image.FImage;
+import org.openimaj.image.Image;
 import org.openimaj.image.feature.local.aggregate.BagOfVisualWords;
 import org.openimaj.image.feature.local.aggregate.BlockSpatialAggregator;
 import org.openimaj.image.feature.local.keypoints.Keypoint;
+import org.openimaj.image.model.patch.HistogramPatchModel;
+import org.openimaj.image.model.patch.PatchClassificationModel;
+import org.openimaj.image.processor.GridProcessor;
+import org.openimaj.math.statistics.distribution.Histogram;
 import org.openimaj.ml.annotation.linear.LiblinearAnnotator;
 import org.openimaj.ml.clustering.ByteCentroidsResult;
+import org.openimaj.ml.clustering.DoubleCentroidsResult;
+import org.openimaj.ml.clustering.FloatCentroidsResult;
 import org.openimaj.ml.clustering.assignment.HardAssigner;
 import org.openimaj.ml.clustering.kmeans.ByteKMeans;
+import org.openimaj.ml.clustering.kmeans.DoubleKMeans;
+import org.openimaj.ml.clustering.kmeans.FeatureVectorKMeans;
+import org.openimaj.ml.clustering.kmeans.FloatKMeans;
+import org.openimaj.util.pair.IntDoublePair;
 import org.openimaj.util.pair.IntFloatPair;
 
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 
 public class Classifier2 {
     private VFSGroupDataset<FImage> training;
@@ -42,45 +57,59 @@ public class Classifier2 {
      */
 
     public void run() {
-        HardAssigner<byte[], float[], IntFloatPair> assigner2 = trainAssigner(GroupedUniformRandomisedSampler.sample(training, 20));
+        HardAssigner<DoubleFV, double[], IntDoublePair> assigner2 = trainAssigner(GroupedUniformRandomisedSampler.sample(training, 20));
         Extractor2 extractor2 = new Extractor2(assigner2);
 
-        LiblinearAnnotator liblinearAnnotator = new LiblinearAnnotator<>(extractor2, LiblinearAnnotator.Mode.MULTILABEL, SolverType.L1R_L2LOSS_SVC, 15, 0.1);
+        LiblinearAnnotator liblinearAnnotator = new LiblinearAnnotator<>(extractor2, LiblinearAnnotator.Mode.MULTILABEL, SolverType.L1R_L2LOSS_SVC, 15, 0.1, 0, true);
         liblinearAnnotator.train(training);
     }
 
     static class Extractor2 implements FeatureExtractor<DoubleFV, FImage> {
-        private final HardAssigner<byte[], float[], IntFloatPair> assigner2;
+        private final HardAssigner<DoubleFV, double[], IntDoublePair> assigner2;
 
-        public Extractor2(HardAssigner<byte[], float[], IntFloatPair> assigner2) {
+        public Extractor2(HardAssigner<DoubleFV, double[], IntDoublePair> assigner2) {
             this.assigner2 = assigner2;
         }
 
         @Override
         public DoubleFV extractFeature(FImage image) {
-            BagOfVisualWords<byte[]> bovw = new BagOfVisualWords<>(assigner2);
+            BagOfVisualWords<DoubleFV> bovw = new BagOfVisualWords<>(assigner2);
 
-            BlockSpatialAggregator<byte[], SparseIntFV> spatial = new BlockSpatialAggregator<>(bovw, 1, 1);
-
-            return spatial.aggregate(imageFeatures(image), image.getBounds()).normaliseFV();
+            return bovw.aggregateVectorsRaw(extractPatchVectors(image)).normaliseFV();
         }
     }
 
-    HardAssigner<byte[], float[], IntFloatPair> trainAssigner(GroupedDataset<String, ListDataset<FImage>, FImage> sample) {
-        List<LocalFeatureList<Keypoint>> allkeys = new ArrayList<>();
+    HardAssigner<DoubleFV, double[], IntDoublePair> trainAssigner(GroupedDataset<String, ListDataset<FImage>, FImage> sample) {
+        ArrayList<double[]> allVectors = new ArrayList<>();
 
         for (FImage image : sample) {
-            allkeys.add(imageFeatures(image));
+            ArrayList<DoubleFV> patchVectors = extractPatchVectors(image);
+
+            for (DoubleFV patchVector : patchVectors) {
+                allVectors.add(patchVector.asDoubleVector());
+            }
+        }
+        double[][] allDoubleVectors = new double[0][];
+
+        for (int i = 0; i < allVectors.size(); i++) {
+            allDoubleVectors[i] = allVectors.get(i);
         }
 
-        ByteKMeans km = ByteKMeans.createKDTreeEnsemble(500);
-        DataSource<byte[]> datasource = new LocalFeatureListDataSource<>(allkeys);
-        ByteCentroidsResult result = km.cluster(datasource);
+        DoubleKMeans kMeans = DoubleKMeans.createExact(500);
+        DoubleCentroidsResult result = kMeans.cluster(allDoubleVectors);
 
         return result.defaultHardAssigner();
     }
 
-    static LocalFeatureList<Keypoint> imageFeatures(FImage image) {
-        return null;
+    static ArrayList<DoubleFV> extractPatchVectors(FImage image) {
+        ArrayList<DoubleFV> patchVectors = new ArrayList<>();
+
+        for (int i = 0; i < image.getWidth(); i += 4) {
+            for (int j = 0; j < image.getHeight(); i += 4) {
+                FImage patch = image.extractROI(i, j, 8, 8);
+                patchVectors.add(new DoubleFV(patch.normalise().getDoublePixelVector()));
+            }
+        }
+        return patchVectors;
     }
 }
