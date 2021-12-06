@@ -57,7 +57,7 @@ public class Classifier2 {
      */
 
     public void run() {
-        HardAssigner<DoubleFV, double[], IntDoublePair> assigner2 = trainAssigner(GroupedUniformRandomisedSampler.sample(training, 20));
+        HardAssigner<double[], double[], IntDoublePair> assigner2 = trainAssigner(GroupedUniformRandomisedSampler.sample(training, 20));
         Extractor2 extractor2 = new Extractor2(assigner2);
 
         LiblinearAnnotator liblinearAnnotator = new LiblinearAnnotator<>(extractor2, LiblinearAnnotator.Mode.MULTILABEL, SolverType.L1R_L2LOSS_SVC, 15, 0.1, 0, true);
@@ -65,29 +65,25 @@ public class Classifier2 {
     }
 
     static class Extractor2 implements FeatureExtractor<DoubleFV, FImage> {
-        private final HardAssigner<DoubleFV, double[], IntDoublePair> assigner2;
+        private final HardAssigner<double[], double[], IntDoublePair> assigner2;
 
-        public Extractor2(HardAssigner<DoubleFV, double[], IntDoublePair> assigner2) {
+        public Extractor2(HardAssigner<double[], double[], IntDoublePair> assigner2) {
             this.assigner2 = assigner2;
         }
 
         @Override
         public DoubleFV extractFeature(FImage image) {
-            BagOfVisualWords<DoubleFV> bovw = new BagOfVisualWords<>(assigner2);
+            BagOfVisualWords<double[]> bovw = new BagOfVisualWords<>(assigner2);
 
             return bovw.aggregateVectorsRaw(extractPatchVectors(image)).normaliseFV();
         }
     }
 
-    HardAssigner<DoubleFV, double[], IntDoublePair> trainAssigner(GroupedDataset<String, ListDataset<FImage>, FImage> sample) {
+    HardAssigner<double[], double[], IntDoublePair> trainAssigner(GroupedDataset<String, ListDataset<FImage>, FImage> sample) {
         ArrayList<double[]> allVectors = new ArrayList<>();
 
         for (FImage image : sample) {
-            ArrayList<DoubleFV> patchVectors = extractPatchVectors(image);
-
-            for (DoubleFV patchVector : patchVectors) {
-                allVectors.add(patchVector.asDoubleVector());
-            }
+            allVectors.addAll(extractPatchVectors(image));
         }
         double[][] allDoubleVectors = new double[0][];
 
@@ -101,13 +97,13 @@ public class Classifier2 {
         return result.defaultHardAssigner();
     }
 
-    static ArrayList<DoubleFV> extractPatchVectors(FImage image) {
-        ArrayList<DoubleFV> patchVectors = new ArrayList<>();
+    static ArrayList<double[]> extractPatchVectors(FImage image) {
+        ArrayList<double[]> patchVectors = new ArrayList<>();
 
         for (int i = 0; i < image.getWidth(); i += 4) {
             for (int j = 0; j < image.getHeight(); i += 4) {
                 FImage patch = image.extractROI(i, j, 8, 8);
-                patchVectors.add(new DoubleFV(patch.normalise().getDoublePixelVector()));
+                patchVectors.add(patch.normalise().getDoublePixelVector());
             }
         }
         return patchVectors;
