@@ -9,4 +9,8 @@ public class Classifier1 {
         this.testing = testing;
         this.training = training;
     }
+
+    public void run() {
+        System.out.println("Test");
+    }
 }
