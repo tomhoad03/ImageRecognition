@@ -4,16 +4,17 @@ import org.openimaj.data.dataset.ListDataset;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
 import org.openimaj.experiment.dataset.sampling.GroupedUniformRandomisedSampler;
-import org.openimaj.feature.DoubleFV;
-import org.openimaj.feature.FeatureExtractor;
-import org.openimaj.feature.SparseIntFV;
+import org.openimaj.feature.*;
 import org.openimaj.image.FImage;
 import org.openimaj.image.feature.local.aggregate.BagOfVisualWords;
 import org.openimaj.ml.annotation.linear.LiblinearAnnotator;
 import org.openimaj.ml.clustering.DoubleCentroidsResult;
+import org.openimaj.ml.clustering.FeatureVectorCentroidsResult;
 import org.openimaj.ml.clustering.assignment.HardAssigner;
 import org.openimaj.ml.clustering.kmeans.DoubleKMeans;
+import org.openimaj.ml.clustering.kmeans.FeatureVectorKMeans;
 import org.openimaj.util.pair.IntDoublePair;
+import org.openimaj.util.pair.IntFloatPair;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,7 +39,7 @@ public class Classifier2 {
 
     public void run() {
         System.out.println("Training the assigner from a sample of the training dataset...");
-        HardAssigner<double[], double[], IntDoublePair> assigner2 = trainAssigner(GroupedUniformRandomisedSampler.sample(training, 20));
+        HardAssigner<DoubleFV, float[], IntFloatPair> assigner2 = trainAssigner(GroupedUniformRandomisedSampler.sample(training, 20));
 
         System.out.println("Setting up the extractor and classifier...");
         Extractor2 extractor2 = new Extractor2(assigner2);
@@ -51,35 +52,33 @@ public class Classifier2 {
     }
 
     // Extracts the features of an image to make a bag of visual words
-    private static class Extractor2 implements FeatureExtractor<SparseIntFV, FImage> {
-        private final HardAssigner<double[], double[], IntDoublePair> assigner2;
+    static class Extractor2 implements FeatureExtractor<DoubleFV, FImage> {
+        private final HardAssigner<DoubleFV, float[], IntFloatPair> assigner2;
 
-        public Extractor2(HardAssigner<double[], double[], IntDoublePair> assigner2) {
+        public Extractor2(HardAssigner<DoubleFV, float[], IntFloatPair> assigner2) {
             this.assigner2 = assigner2;
         }
 
         @Override
-        public SparseIntFV extractFeature(FImage image) {
-            BagOfVisualWords<double[]> bovw = new BagOfVisualWords<>(assigner2);
-            return bovw.aggregateVectorsRaw(extractPatchVectors(image));
+        public DoubleFV extractFeature(FImage image) {
+            BagOfVisualWords<DoubleFV> bovw = new BagOfVisualWords<>(assigner2);
+            return bovw.aggregateVectorsRaw(extractPatchVectors(image)).normaliseFV();
         }
     }
 
     // Trains the assigner using a sample from the training dataset using K-Means clustering
-    private HardAssigner<double[], double[], IntDoublePair> trainAssigner(GroupedDataset<String, ListDataset<FImage>, FImage> sample) {
+    HardAssigner<DoubleFV, float[], IntFloatPair> trainAssigner(GroupedDataset<String, ListDataset<FImage>, FImage> sample) {
         System.out.println("Extract patch vectors from sample set images...");
 
-        List<double[]> allVectors = new ArrayList<>();
-
+        List<DoubleFV> allVectors = new ArrayList<>();
         for (FImage image : sample) {
             allVectors.addAll(extractPatchVectors(image));
         }
-        double[][] allDoubleVectors = allVectors.toArray(new double[0][0]);
 
         System.out.println("Perform K-means clustering on the patch vectors...");
 
-        DoubleKMeans kMeans = DoubleKMeans.createExact(499);
-        DoubleCentroidsResult result = kMeans.cluster(allDoubleVectors);
+        FeatureVectorKMeans<DoubleFV> kMeans = FeatureVectorKMeans.createExact(500, DoubleFVComparison.EUCLIDEAN);
+        FeatureVectorCentroidsResult<DoubleFV> result = kMeans.cluster(allVectors);
 
         System.out.println("K-means clustering finished...");
 
@@ -87,13 +86,13 @@ public class Classifier2 {
     }
 
     // Converts an image to a collection of vectors that represent 8x8 patches each spaced 4 pixels apart
-    private static ArrayList<double[]> extractPatchVectors(FImage image) {
-        ArrayList<double[]> patchVectors = new ArrayList<>();
+    static ArrayList<DoubleFV> extractPatchVectors(FImage image) {
+        ArrayList<DoubleFV> patchVectors = new ArrayList<>();
 
         for (int i = 0; i < image.getWidth(); i += 4) {
             for (int j = 0; j < image.getHeight(); j += 4) {
                 FImage patch = image.extractROI(i, j, 8, 8);
-                patchVectors.add(patch.normalise().getDoublePixelVector());
+                patchVectors.add(new DoubleFV(patch.normalise().getDoublePixelVector()));
             }
         }
         return patchVectors;
