@@ -1,5 +1,4 @@
 import org.openimaj.data.dataset.VFSGroupDataset;
-import org.openimaj.data.dataset.VFSListDataset;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 
@@ -9,7 +8,7 @@ public class ImageRecognition {
     public static void main(String[] args) {
         try {
             VFSGroupDataset<FImage> training = new VFSGroupDataset<>("zip:" + Paths.get("").toAbsolutePath() + "\\images\\training.zip", ImageUtilities.FIMAGE_READER);
-            VFSListDataset<FImage> testing = new VFSListDataset<>("zip:" + Paths.get("").toAbsolutePath() + "\\images\\testing.zip", ImageUtilities.FIMAGE_READER);
+            VFSGroupDataset<FImage> testing = new VFSGroupDataset<>("zip:" + Paths.get("").toAbsolutePath() + "\\images\\testing.zip", ImageUtilities.FIMAGE_READER);
 
             Classifier1 classifier1 = new Classifier1(testing, training);
 
