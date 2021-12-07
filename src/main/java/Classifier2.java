@@ -2,7 +2,6 @@ import de.bwaldvogel.liblinear.SolverType;
 import org.openimaj.data.dataset.GroupedDataset;
 import org.openimaj.data.dataset.ListDataset;
 import org.openimaj.data.dataset.VFSGroupDataset;
-import org.openimaj.data.dataset.VFSListDataset;
 import org.openimaj.experiment.dataset.sampling.GroupedUniformRandomisedSampler;
 import org.openimaj.experiment.evaluation.classification.ClassificationEvaluator;
 import org.openimaj.experiment.evaluation.classification.ClassificationResult;
@@ -53,11 +52,11 @@ public class Classifier2 {
 
     public void run() {
         System.out.println("Training the assigner from a sample of the training dataset...");
-        HardAssigner<DoubleFV, float[], IntFloatPair> assigner2 = trainAssigner(GroupedUniformRandomisedSampler.sample(training, 2));
+        HardAssigner<DoubleFV, float[], IntFloatPair> assigner2 = trainAssigner(GroupedUniformRandomisedSampler.sample(training, 15));
 
         System.out.println("Setting up the extractor and classifier...");
         Extractor2 extractor2 = new Extractor2(assigner2);
-        LiblinearAnnotator<FImage, String> liblinearAnnotator = new LiblinearAnnotator<>(extractor2, LiblinearAnnotator.Mode.MULTILABEL, SolverType.L1R_L2LOSS_SVC, 15, 0.00001);
+        LiblinearAnnotator<FImage, String> liblinearAnnotator = new LiblinearAnnotator<>(extractor2, LiblinearAnnotator.Mode.MULTILABEL, SolverType.L1R_L2LOSS_SVC, 1, 0.00001);
 
         System.out.println("Running the assigner on the training dataset...");
         liblinearAnnotator.train(training);
@@ -65,6 +64,8 @@ public class Classifier2 {
         System.out.println("Running the classifier on the testing dataset...");
         ClassificationEvaluator<CMResult<String>, String, FImage> eval = new ClassificationEvaluator<>(liblinearAnnotator, testing, new CMAnalyser<>(CMAnalyser.Strategy.SINGLE)); // new ClassificationEvaluator<CMResult<String>, String, FImage>(liblinearAnnotator, testing, new CMAnalyser<String, FImage>(CMAnalyser.Strategy.SINGLE));
         Map<FImage, ClassificationResult<String>> guesses = eval.evaluate();
+
+        System.out.println("Producing the results of the classification...");
         CMResult<String> result = eval.analyse(guesses);
 
         System.out.println("Printing the results of the classification...");
@@ -91,16 +92,13 @@ public class Classifier2 {
         System.out.println("Extract patch vectors from sample set images...");
 
         List<DoubleFV> allVectors = new ArrayList<>();
-
-        Parallel.forEach(sample, image -> {
-            synchronized (allVectors) {
-                allVectors.addAll(extractPatchVectors(image));
-            }
-        });
+        for (FImage image : sample) {
+            allVectors.addAll(extractPatchVectors(image));
+        }
 
         System.out.println("Perform K-means clustering on the patch vectors...");
 
-        FeatureVectorKMeans<DoubleFV> kMeans = FeatureVectorKMeans.createExact(5, DoubleFVComparison.EUCLIDEAN);
+        FeatureVectorKMeans<DoubleFV> kMeans = FeatureVectorKMeans.createExact(25, DoubleFVComparison.EUCLIDEAN);
         FeatureVectorCentroidsResult<DoubleFV> result = kMeans.cluster(allVectors);
 
         System.out.println("K-means clustering finished...");
@@ -110,22 +108,14 @@ public class Classifier2 {
 
     // Converts an image to a collection of vectors that represent 8x8 patches each spaced 4 pixels apart
     static ArrayList<DoubleFV> extractPatchVectors(FImage image) {
-        ArrayList<FImage> patchImages = new ArrayList<>();
         ArrayList<DoubleFV> patchVectors = new ArrayList<>();
 
-        for (int i = 0; i < image.getWidth(); i += 4) {
-            for (int j = 0; j < image.getHeight(); j += 4) {
+        for (int i = 0; i < image.getWidth() - 4; i += 4) {
+            for (int j = 0; j < image.getHeight() - 4; j += 4) {
                 FImage patch = image.extractROI(i, j, 8, 8);
-                patchImages.add(patch);
-            }
-        }
-
-        Parallel.forEach(patchImages, patch -> {
-            synchronized (patchVectors) {
                 patchVectors.add(new DoubleFV(patch.normalise().getDoublePixelVector()));
             }
-        });
-
+        }
         return patchVectors;
     }
 }
