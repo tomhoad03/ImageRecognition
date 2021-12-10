@@ -10,7 +10,6 @@ import org.openimaj.experiment.evaluation.classification.analysers.confusionmatr
 import org.openimaj.feature.DoubleFV;
 import org.openimaj.feature.DoubleFVComparison;
 import org.openimaj.feature.FeatureExtractor;
-import org.openimaj.feature.SparseIntFV;
 import org.openimaj.image.FImage;
 import org.openimaj.image.feature.local.aggregate.BagOfVisualWords;
 import org.openimaj.ml.annotation.linear.LiblinearAnnotator;
@@ -18,8 +17,9 @@ import org.openimaj.ml.clustering.FeatureVectorCentroidsResult;
 import org.openimaj.ml.clustering.assignment.HardAssigner;
 import org.openimaj.ml.clustering.kmeans.FeatureVectorKMeans;
 import org.openimaj.util.pair.IntFloatPair;
-import org.openimaj.util.parallel.Parallel;
 
+import java.io.FileWriter;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -33,27 +33,9 @@ public class Classifier2 {
         this.testing = testing;
     }
 
-    /*
-    1. Take fixed size densely-sampled pixel patches (8x8 in size and 4 pixels apart in the x and y directions)
-    2. Mean centering and normalise the patches
-    3. Extract visual words features from the image patches
-    4. Use K-Means clustering to group the bags into 1 of 500 clusters
-    5. Create a BOVW from the clusters
-    6. Classify the image from the BOVW
-
-    Problems:
-    1. 'Illegal' clustering after switching to FVKMeans
-    2. Very slow classification of the training set
-
-    Next:
-    1. Classification of the testing set
-    2. Optimisations wherever possible
-    3. Check it's actually doing it correctly/doing what the spec wants
-     */
-
-    public void run() {
+    public void run() throws Exception {
         System.out.println("Training the assigner from a sample of the training dataset...");
-        HardAssigner<DoubleFV, float[], IntFloatPair> assigner2 = trainAssigner(GroupedUniformRandomisedSampler.sample(training, 16));
+        HardAssigner<DoubleFV, float[], IntFloatPair> assigner2 = trainAssigner(GroupedUniformRandomisedSampler.sample(training, 50));
 
         System.out.println("Setting up the extractor and classifier...");
         Extractor2 extractor2 = new Extractor2(assigner2);
@@ -67,14 +49,20 @@ public class Classifier2 {
         Map<FImage, ClassificationResult<String>> evaluation2 = evaluator2.evaluate();
 
         System.out.println("Producing the results of the classification...");
-        CMResult<String> result2 = evaluator2.analyse(evaluation2);
+        FileWriter fileWriter = new FileWriter(Paths.get("").toAbsolutePath() + "\\runs\\run2.txt");
+        int count = 0;
 
-        System.out.println("Printing the results of the classification...");
-        System.out.println(result2);
+        for (Map.Entry<FImage, ClassificationResult<String>> entry : evaluation2.entrySet()) {
+            String fileName = count + ".jpg"; count++;
+
+            String prediction = entry.getValue().getPredictedClasses().toString();
+            fileWriter.write(fileName + " " + prediction + "\n");
+        }
+        fileWriter.close();
     }
 
     // Extracts the features of an image to make a bag of visual words
-    static class Extractor2 implements FeatureExtractor<SparseIntFV, FImage> {
+    static class Extractor2 implements FeatureExtractor<DoubleFV, FImage> {
         private final HardAssigner<DoubleFV, float[], IntFloatPair> assigner2;
 
         public Extractor2(HardAssigner<DoubleFV, float[], IntFloatPair> assigner2) {
@@ -82,28 +70,23 @@ public class Classifier2 {
         }
 
         @Override
-        public SparseIntFV extractFeature(FImage image) {
+        public DoubleFV extractFeature(FImage image) {
             BagOfVisualWords<DoubleFV> bovw = new BagOfVisualWords<>(assigner2);
-            return bovw.aggregateVectorsRaw(extractPatchVectors(image));
+            return bovw.aggregateVectorsRaw(extractPatchVectors(image)).normaliseFV();
         }
     }
 
     // Trains the assigner using a sample from the training dataset using K-Means clustering
     HardAssigner<DoubleFV, float[], IntFloatPair> trainAssigner(GroupedDataset<String, ListDataset<FImage>, FImage> sample) {
         System.out.println("Extract patch vectors from sample set images...");
-
         List<DoubleFV> allVectors = new ArrayList<>();
         for (FImage image : sample) {
             allVectors.addAll(extractPatchVectors(image));
         }
 
         System.out.println("Perform K-means clustering on the patch vectors...");
-
-        FeatureVectorKMeans<DoubleFV> kMeans = FeatureVectorKMeans.createExact(25, DoubleFVComparison.EUCLIDEAN);
+        FeatureVectorKMeans<DoubleFV> kMeans = FeatureVectorKMeans.createExact(500, DoubleFVComparison.EUCLIDEAN);
         FeatureVectorCentroidsResult<DoubleFV> result = kMeans.cluster(allVectors);
-
-        System.out.println("K-means clustering finished...");
-
         return result.defaultHardAssigner();
     }
 
