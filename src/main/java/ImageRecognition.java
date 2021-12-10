@@ -7,8 +7,8 @@ import java.nio.file.Paths;
 public class ImageRecognition {
     public static void main(String[] args) {
         try {
-            VFSGroupDataset<FImage> training = new VFSGroupDataset<>("zip:" + Paths.get("").toAbsolutePath() + "\\images\\training.zip", ImageUtilities.FIMAGE_READER);
-            VFSGroupDataset<FImage> testing = new VFSGroupDataset<>("zip:" + Paths.get("").toAbsolutePath() + "\\images\\testing.zip", ImageUtilities.FIMAGE_READER);
+            VFSGroupDataset<FImage> training = new VFSGroupDataset<>(Paths.get("").toAbsolutePath() + "\\images\\training", ImageUtilities.FIMAGE_READER);
+            VFSGroupDataset<FImage> testing = new VFSGroupDataset<>(Paths.get("").toAbsolutePath() + "\\images\\testing", ImageUtilities.FIMAGE_READER);
 
             Classifier1 classifier1 = new Classifier1(testing, training);
 

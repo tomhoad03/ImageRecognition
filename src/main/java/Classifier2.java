@@ -10,6 +10,7 @@ import org.openimaj.experiment.evaluation.classification.analysers.confusionmatr
 import org.openimaj.feature.DoubleFV;
 import org.openimaj.feature.DoubleFVComparison;
 import org.openimaj.feature.FeatureExtractor;
+import org.openimaj.feature.SparseIntFV;
 import org.openimaj.image.FImage;
 import org.openimaj.image.feature.local.aggregate.BagOfVisualWords;
 import org.openimaj.ml.annotation.linear.LiblinearAnnotator;
@@ -52,7 +53,7 @@ public class Classifier2 {
 
     public void run() {
         System.out.println("Training the assigner from a sample of the training dataset...");
-        HardAssigner<DoubleFV, float[], IntFloatPair> assigner2 = trainAssigner(GroupedUniformRandomisedSampler.sample(training, 15));
+        HardAssigner<DoubleFV, float[], IntFloatPair> assigner2 = trainAssigner(GroupedUniformRandomisedSampler.sample(training, 16));
 
         System.out.println("Setting up the extractor and classifier...");
         Extractor2 extractor2 = new Extractor2(assigner2);
@@ -62,18 +63,18 @@ public class Classifier2 {
         liblinearAnnotator.train(training);
 
         System.out.println("Running the classifier on the testing dataset...");
-        ClassificationEvaluator<CMResult<String>, String, FImage> eval = new ClassificationEvaluator<>(liblinearAnnotator, testing, new CMAnalyser<>(CMAnalyser.Strategy.SINGLE)); // new ClassificationEvaluator<CMResult<String>, String, FImage>(liblinearAnnotator, testing, new CMAnalyser<String, FImage>(CMAnalyser.Strategy.SINGLE));
-        Map<FImage, ClassificationResult<String>> guesses = eval.evaluate();
+        ClassificationEvaluator<CMResult<String>, String, FImage> evaluator2 = new ClassificationEvaluator<>(liblinearAnnotator, testing, new CMAnalyser<>(CMAnalyser.Strategy.SINGLE));
+        Map<FImage, ClassificationResult<String>> evaluation2 = evaluator2.evaluate();
 
         System.out.println("Producing the results of the classification...");
-        CMResult<String> result = eval.analyse(guesses);
+        CMResult<String> result2 = evaluator2.analyse(evaluation2);
 
         System.out.println("Printing the results of the classification...");
-        System.out.println(result);
+        System.out.println(result2);
     }
 
     // Extracts the features of an image to make a bag of visual words
-    static class Extractor2 implements FeatureExtractor<DoubleFV, FImage> {
+    static class Extractor2 implements FeatureExtractor<SparseIntFV, FImage> {
         private final HardAssigner<DoubleFV, float[], IntFloatPair> assigner2;
 
         public Extractor2(HardAssigner<DoubleFV, float[], IntFloatPair> assigner2) {
@@ -81,9 +82,9 @@ public class Classifier2 {
         }
 
         @Override
-        public DoubleFV extractFeature(FImage image) {
+        public SparseIntFV extractFeature(FImage image) {
             BagOfVisualWords<DoubleFV> bovw = new BagOfVisualWords<>(assigner2);
-            return bovw.aggregateVectorsRaw(extractPatchVectors(image)).normaliseFV();
+            return bovw.aggregateVectorsRaw(extractPatchVectors(image));
         }
     }
 
