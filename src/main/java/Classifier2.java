@@ -7,9 +7,10 @@ import org.openimaj.experiment.evaluation.classification.ClassificationEvaluator
 import org.openimaj.experiment.evaluation.classification.ClassificationResult;
 import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMAnalyser;
 import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMResult;
-import org.openimaj.feature.DoubleFV;
-import org.openimaj.feature.DoubleFVComparison;
+import org.openimaj.feature.FloatFV;
+import org.openimaj.feature.FloatFVComparison;
 import org.openimaj.feature.FeatureExtractor;
+import org.openimaj.feature.SparseIntFV;
 import org.openimaj.image.FImage;
 import org.openimaj.image.feature.local.aggregate.BagOfVisualWords;
 import org.openimaj.ml.annotation.linear.LiblinearAnnotator;
@@ -35,11 +36,11 @@ public class Classifier2 {
 
     public void run() throws Exception {
         System.out.println("Training the assigner from a sample of the training dataset...");
-        HardAssigner<DoubleFV, float[], IntFloatPair> assigner2 = trainAssigner(GroupedUniformRandomisedSampler.sample(training, 50));
+        HardAssigner<FloatFV, float[], IntFloatPair> assigner2 = trainAssigner(GroupedUniformRandomisedSampler.sample(training, 50));
 
         System.out.println("Setting up the extractor and classifier...");
         Extractor2 extractor2 = new Extractor2(assigner2);
-        LiblinearAnnotator<FImage, String> liblinearAnnotator = new LiblinearAnnotator<>(extractor2, LiblinearAnnotator.Mode.MULTILABEL, SolverType.L1R_L2LOSS_SVC, 1, 0.00001);
+        LiblinearAnnotator<FImage, String> liblinearAnnotator = new LiblinearAnnotator<>(extractor2, LiblinearAnnotator.Mode.MULTICLASS, SolverType.L1R_L2LOSS_SVC, 1, 0.00001);
 
         System.out.println("Running the assigner on the training dataset...");
         liblinearAnnotator.train(training);
@@ -48,7 +49,7 @@ public class Classifier2 {
         ClassificationEvaluator<CMResult<String>, String, FImage> evaluator2 = new ClassificationEvaluator<>(liblinearAnnotator, testing, new CMAnalyser<>(CMAnalyser.Strategy.SINGLE));
         Map<FImage, ClassificationResult<String>> evaluation2 = evaluator2.evaluate();
 
-        System.out.println("Producing the results of the classification...");
+        System.out.println("Printing the results of the classification...");
         FileWriter fileWriter = new FileWriter(Paths.get("").toAbsolutePath() + "\\runs\\run2.txt");
         int count = 0;
 
@@ -56,48 +57,49 @@ public class Classifier2 {
             String fileName = count + ".jpg"; count++;
 
             String prediction = entry.getValue().getPredictedClasses().toString();
-            fileWriter.write(fileName + " " + prediction + "\n");
+            fileWriter.write(fileName + " " + prediction + " " + entry.getKey().getWidth() + " " + entry.getKey().getHeight() + "\n");
         }
         fileWriter.close();
+        System.out.println("Classification has finished...");
     }
 
     // Extracts the features of an image to make a bag of visual words
-    static class Extractor2 implements FeatureExtractor<DoubleFV, FImage> {
-        private final HardAssigner<DoubleFV, float[], IntFloatPair> assigner2;
+    static class Extractor2 implements FeatureExtractor<SparseIntFV, FImage> {
+        private final HardAssigner<FloatFV, float[], IntFloatPair> assigner2;
 
-        public Extractor2(HardAssigner<DoubleFV, float[], IntFloatPair> assigner2) {
+        public Extractor2(HardAssigner<FloatFV, float[], IntFloatPair> assigner2) {
             this.assigner2 = assigner2;
         }
 
         @Override
-        public DoubleFV extractFeature(FImage image) {
-            BagOfVisualWords<DoubleFV> bovw = new BagOfVisualWords<>(assigner2);
-            return bovw.aggregateVectorsRaw(extractPatchVectors(image)).normaliseFV();
+        public SparseIntFV extractFeature(FImage image) {
+            BagOfVisualWords<FloatFV> bovw = new BagOfVisualWords<>(assigner2);
+            return bovw.aggregateVectorsRaw(extractPatchVectors(image));
         }
     }
 
     // Trains the assigner using a sample from the training dataset using K-Means clustering
-    HardAssigner<DoubleFV, float[], IntFloatPair> trainAssigner(GroupedDataset<String, ListDataset<FImage>, FImage> sample) {
+    HardAssigner<FloatFV, float[], IntFloatPair> trainAssigner(GroupedDataset<String, ListDataset<FImage>, FImage> sample) {
         System.out.println("Extract patch vectors from sample set images...");
-        List<DoubleFV> allVectors = new ArrayList<>();
+        List<FloatFV> allVectors = new ArrayList<>();
         for (FImage image : sample) {
             allVectors.addAll(extractPatchVectors(image));
         }
 
         System.out.println("Perform K-means clustering on the patch vectors...");
-        FeatureVectorKMeans<DoubleFV> kMeans = FeatureVectorKMeans.createExact(500, DoubleFVComparison.EUCLIDEAN);
-        FeatureVectorCentroidsResult<DoubleFV> result = kMeans.cluster(allVectors);
+        FeatureVectorKMeans<FloatFV> kMeans = FeatureVectorKMeans.createExact(50, FloatFVComparison.EUCLIDEAN);
+        FeatureVectorCentroidsResult<FloatFV> result = kMeans.cluster(allVectors);
         return result.defaultHardAssigner();
     }
 
     // Converts an image to a collection of vectors that represent 8x8 patches each spaced 4 pixels apart
-    static ArrayList<DoubleFV> extractPatchVectors(FImage image) {
-        ArrayList<DoubleFV> patchVectors = new ArrayList<>();
+    static ArrayList<FloatFV> extractPatchVectors(FImage image) {
+        ArrayList<FloatFV> patchVectors = new ArrayList<>();
 
         for (int i = 0; i < image.getWidth() - 4; i += 4) {
             for (int j = 0; j < image.getHeight() - 4; j += 4) {
                 FImage patch = image.extractROI(i, j, 8, 8);
-                patchVectors.add(new DoubleFV(patch.normalise().getDoublePixelVector()));
+                patchVectors.add(new FloatFV(patch.normalise().getFloatPixelVector()));
             }
         }
         return patchVectors;
