@@ -7,9 +7,9 @@ import org.openimaj.experiment.evaluation.classification.ClassificationEvaluator
 import org.openimaj.experiment.evaluation.classification.ClassificationResult;
 import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMAnalyser;
 import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMResult;
+import org.openimaj.feature.FeatureExtractor;
 import org.openimaj.feature.FloatFV;
 import org.openimaj.feature.FloatFVComparison;
-import org.openimaj.feature.FeatureExtractor;
 import org.openimaj.feature.SparseIntFV;
 import org.openimaj.image.FImage;
 import org.openimaj.image.feature.local.aggregate.BagOfVisualWords;
@@ -19,11 +19,10 @@ import org.openimaj.ml.clustering.assignment.HardAssigner;
 import org.openimaj.ml.clustering.kmeans.FeatureVectorKMeans;
 import org.openimaj.util.pair.IntFloatPair;
 
+import java.io.File;
 import java.io.FileWriter;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class Classifier2 {
     private final VFSGroupDataset<FImage> training;
@@ -49,15 +48,28 @@ public class Classifier2 {
         ClassificationEvaluator<CMResult<String>, String, FImage> evaluator2 = new ClassificationEvaluator<>(liblinearAnnotator, testing, new CMAnalyser<>(CMAnalyser.Strategy.SINGLE));
         Map<FImage, ClassificationResult<String>> evaluation2 = evaluator2.evaluate();
 
+        System.out.println("Analysing the results of the classification...");
+        File files = new File(Paths.get("").toAbsolutePath() + "\\images\\testing\\testing");
+        ArrayList<String> fileNames = new ArrayList<>(List.of(Objects.requireNonNull(files.list())));
+        ArrayList<String> results = new ArrayList<>(); int count = 0;
+
+        for (FImage image : testing.get("testing")) {
+            for (Map.Entry<FImage, ClassificationResult<String>> evalEntry : evaluation2.entrySet()) {
+                if (evalEntry.getKey().equals(image)) {
+                    String fileName = fileNames.get(count); count++;
+                    String prediction = evalEntry.getValue().getPredictedClasses().toString();
+
+                    results.add(fileName + " " + prediction + "\n");
+                    break;
+                }
+            }
+        }
+        results.sort(Comparator.comparing(o -> Integer.parseInt(o.substring(0, o.indexOf(".jpg")))));
+
         System.out.println("Printing the results of the classification...");
         FileWriter fileWriter = new FileWriter(Paths.get("").toAbsolutePath() + "\\runs\\run2.txt");
-        int count = 0;
-
-        for (Map.Entry<FImage, ClassificationResult<String>> entry : evaluation2.entrySet()) {
-            String fileName = count + ".jpg"; count++;
-
-            String prediction = entry.getValue().getPredictedClasses().toString();
-            fileWriter.write(fileName + " " + prediction + " " + entry.getKey().getWidth() + " " + entry.getKey().getHeight() + "\n");
+        for (String result : results) {
+            fileWriter.write(result);
         }
         fileWriter.close();
         System.out.println("Classification has finished...");
@@ -87,7 +99,7 @@ public class Classifier2 {
         }
 
         System.out.println("Perform K-means clustering on the patch vectors...");
-        FeatureVectorKMeans<FloatFV> kMeans = FeatureVectorKMeans.createExact(50, FloatFVComparison.EUCLIDEAN);
+        FeatureVectorKMeans<FloatFV> kMeans = FeatureVectorKMeans.createExact(500, FloatFVComparison.EUCLIDEAN);
         FeatureVectorCentroidsResult<FloatFV> result = kMeans.cluster(allVectors);
         return result.defaultHardAssigner();
     }
