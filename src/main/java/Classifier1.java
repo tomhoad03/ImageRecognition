@@ -29,6 +29,11 @@ public class Classifier1 extends BatchAnnotator<FImage, String> {
     private Set<String> annotations;
     private FloatNearestNeighboursExact knn;
     private String[] trainingAnnotations;
+    private int k;
+
+    public Classifier1(int k){
+        this.k = k;
+    }
 
     public FImage makeTiny(FImage image) {
         int size = Math.min(image.width, image.height);
@@ -49,7 +54,7 @@ public class Classifier1 extends BatchAnnotator<FImage, String> {
 
     @Override
     public List<ScoredAnnotation<String>> annotate(FImage image) {
-        List<IntFloatPair> nearest = this.knn.searchKNN(flattenImage(makeTiny(image)), 10);
+        List<IntFloatPair> nearest = this.knn.searchKNN(flattenImage(makeTiny(image)), k);
         List<ScoredAnnotation<String>> result = new ArrayList<ScoredAnnotation<String>>(1);
         nearest.stream()
                 .map(e -> trainingAnnotations[e.getFirst()])
@@ -57,7 +62,7 @@ public class Classifier1 extends BatchAnnotator<FImage, String> {
                 .entrySet()
                 .stream()
                 .max(Map.Entry.comparingByValue())
-                .ifPresent(e -> result.add(new ScoredAnnotation<String>(e.getKey(), (float) e.getValue() / 15)));
+                .ifPresent(e -> result.add(new ScoredAnnotation<String>(e.getKey(), (float) e.getValue() / k)));
         return result;
     }
 

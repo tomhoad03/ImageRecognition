@@ -17,7 +17,7 @@ public class ImageRecognition {
             final VFSGroupDataset<FImage> training = new VFSGroupDataset<>(Paths.get("").toAbsolutePath() + "\\images\\training\\training", ImageUtilities.FIMAGE_READER);
             final VFSGroupDataset<FImage> testing = new VFSGroupDataset<>(Paths.get("").toAbsolutePath() + "\\images\\testing", ImageUtilities.FIMAGE_READER);
 
-            Classifier1 classifier1 = new Classifier1();
+            Classifier1 classifier1 = new Classifier1(10);
             classifier1.train(training);
 
             ClassificationEvaluator<CMResult<String>, String, FImage> evaluator = new ClassificationEvaluator<>(classifier1, testing, new CMAnalyser<>(CMAnalyser.Strategy.SINGLE));
