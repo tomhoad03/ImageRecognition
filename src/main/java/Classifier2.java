@@ -12,7 +12,11 @@ import org.openimaj.feature.FloatFV;
 import org.openimaj.feature.FloatFVComparison;
 import org.openimaj.feature.SparseIntFV;
 import org.openimaj.image.FImage;
+import org.openimaj.image.Image;
 import org.openimaj.image.feature.local.aggregate.BagOfVisualWords;
+import org.openimaj.image.processing.algorithm.MeanCenter;
+import org.openimaj.image.processor.ImageProcessor;
+import org.openimaj.image.processor.PixelProcessor;
 import org.openimaj.ml.annotation.linear.LiblinearAnnotator;
 import org.openimaj.ml.clustering.FeatureVectorCentroidsResult;
 import org.openimaj.ml.clustering.assignment.HardAssigner;
@@ -108,9 +112,16 @@ public class Classifier2 {
     static ArrayList<FloatFV> extractPatchVectors(FImage image) {
         ArrayList<FloatFV> patchVectors = new ArrayList<>();
 
-        for (int i = 0; i < image.getWidth() - 4; i += 4) {
-            for (int j = 0; j < image.getHeight() - 4; j += 4) {
+        for (int i = 0; i < image.getHeight() - 4; i += 4) {
+            for (int j = 0; j < image.getWidth() - 4; j += 4) {
                 FImage patch = image.extractROI(i, j, 8, 8);
+                float mean = MeanCenter.patchMean(patch.pixels);
+
+                for (int m = 0; m < patch.getHeight(); m++) {
+                    for(int n = 0; n < patch.getWidth(); n++) {
+                        patch.pixels[m][n] = patch.pixels[m][n] - mean;
+                    }
+                }
                 patchVectors.add(new FloatFV(patch.normalise().getFloatPixelVector()));
             }
         }
