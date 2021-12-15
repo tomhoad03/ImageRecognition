@@ -1,10 +1,13 @@
+import com.android.dx.rop.annotation.AnnotationsList;
 import org.openimaj.data.dataset.GroupedDataset;
 import org.openimaj.data.dataset.ListDataset;
 import org.openimaj.data.dataset.VFSGroupDataset;
+import org.openimaj.data.dataset.VFSListDataset;
 import org.openimaj.experiment.evaluation.classification.ClassificationEvaluator;
 import org.openimaj.experiment.evaluation.classification.ClassificationResult;
 import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMAnalyser;
 import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMResult;
+import org.openimaj.image.DisplayUtilities;
 import org.openimaj.image.FImage;
 import org.openimaj.image.processing.resize.ResizeProcessor;
 import org.openimaj.knn.FloatNearestNeighboursExact;
@@ -12,56 +15,17 @@ import org.openimaj.ml.annotation.Annotated;
 import org.openimaj.ml.annotation.BatchAnnotator;
 import org.openimaj.ml.annotation.ScoredAnnotation;
 import org.openimaj.util.array.ArrayUtils;
+import org.openimaj.util.pair.IntFloatPair;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class Classifier1 extends BatchAnnotator<FImage, String> {
-    private VFSGroupDataset<FImage> testing;
-    private VFSGroupDataset<FImage> training;
     private Set<String> annotations;
-
-    public Classifier1(VFSGroupDataset<FImage> testing, VFSGroupDataset<FImage> training) {
-        this.testing = testing;
-        this.training = training;
-        this.annotations = training.getGroups();
-    }
-
-    public void run() {
-
-        float[][] trainingData = new float[training.numInstances()][16*16];
-
-        int imageIndex = 0;
-        for (String instance : training.getGroups()) {
-            for (FImage image : training.get(instance)) {
-                trainingData[imageIndex] = flattenImage(makeTiny(image));
-                imageIndex++;
-            }
-
-        }
-
-        FloatNearestNeighboursExact knn = new FloatNearestNeighboursExact(trainingData);
-
-
-        for (String instance : testing.getGroups()) {
-            for (FImage image : testing.get(instance)) {
-                knn.searchKNN(flattenImage(makeTiny(image)), 10);
-            }
-        }
-
-
-
-
-
-        ClassificationEvaluator<CMResult<String>, String, FImage> eval =
-                new ClassificationEvaluator<CMResult<String>, String, FImage>(
-                        knn, testing, new CMAnalyser<FImage, String>(CMAnalyser.Strategy.SINGLE));
-
-        Map<Record<FImage>, ClassificationResult<String>> guesses = eval.evaluate();
-        CMResult<String> result = eval.analyse(guesses);
-
-
-    }
+    private FloatNearestNeighboursExact knn;
+    private String[] trainingAnnotations;
 
     public FImage makeTiny(FImage image) {
         int size = Math.min(image.width, image.height);
@@ -81,8 +45,12 @@ public class Classifier1 extends BatchAnnotator<FImage, String> {
     }
 
     @Override
-    public List<ScoredAnnotation<String>> annotate(FImage object) {
-        return null;
+    public List<ScoredAnnotation<String>> annotate(FImage image) {
+        IntFloatPair nearest = this.knn.searchNN(flattenImage(makeTiny(image)));
+        List<ScoredAnnotation<String>> result = new ArrayList<ScoredAnnotation<String>>(1);
+        result.add(new ScoredAnnotation<String>(this.trainingAnnotations[nearest.getFirst()], 1f));
+        System.out.println(result);
+        return result;
     }
 
     @Override
@@ -90,17 +58,20 @@ public class Classifier1 extends BatchAnnotator<FImage, String> {
 
         this.annotations = training.getGroups();
         float[][] trainingData = new float[training.numInstances()][16*16];
+        this.trainingAnnotations = new String[trainingData.length];
 
         int imageIndex = 0;
         for (String instance : training.getGroups()) {
+            System.out.println(instance);
             for (FImage image : training.get(instance)) {
                 trainingData[imageIndex] = flattenImage(makeTiny(image));
+                trainingAnnotations[imageIndex] = instance;
                 imageIndex++;
             }
 
         }
 
-        FloatNearestNeighboursExact knn = new FloatNearestNeighboursExact(trainingData);
+        this.knn = new FloatNearestNeighboursExact(trainingData);
 
 
     }
