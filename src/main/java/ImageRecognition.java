@@ -16,17 +16,17 @@ public class ImageRecognition {
 
             Classifier1 classifier1 = new Classifier1(training, testing);
             classifier1.run();
-            print(classifier1);
+            print(classifier1, 1);
 
             Classifier2 classifier2 = new Classifier2(training, testing);
             classifier2.run();
-            print(classifier2);
+            print(classifier2, 2);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public static void print(Classifier classifier) throws Exception {
+    public static void print(Classifier classifier, int i) throws Exception {
         System.out.println("Analysing the results of the classification...");
         File files = new File(Paths.get("").toAbsolutePath() + "\\images\\testing\\testing");
         ArrayList<String> fileNames = new ArrayList<>(List.of(Objects.requireNonNull(files.list())));
@@ -46,7 +46,7 @@ public class ImageRecognition {
         results.sort(Comparator.comparing(o -> Integer.parseInt(o.substring(0, o.indexOf(".jpg")))));
 
         System.out.println("Printing the results of the classification...");
-        FileWriter fileWriter = new FileWriter(Paths.get("").toAbsolutePath() + "\\runs\\run2.txt");
+        FileWriter fileWriter = new FileWriter(Paths.get("").toAbsolutePath() + "\\runs\\run" + i + ".txt");
         for (String result : results) {
             fileWriter.write(result);
         }

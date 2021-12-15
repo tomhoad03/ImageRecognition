@@ -25,7 +25,7 @@ public class Classifier1 extends Classifier {
 
     public Classifier1(VFSGroupDataset<FImage> training, VFSGroupDataset<FImage> testing) {
         super(training, testing);
-        this.annotator1 = new Annotator1();
+        this.annotator1 = new Annotator1(10);
     }
 
     public void run() {
@@ -39,10 +39,14 @@ class Annotator1 extends BatchAnnotator<FImage, String> {
     private Set<String> annotations;
     private FloatNearestNeighboursExact knn;
     private String[] trainingAnnotations;
+    private final int k;
+
+    public Annotator1(int k){
+        this.k = k;
+    }
 
     public FImage makeTiny(FImage image) {
         int size = Math.min(image.width, image.height);
-
         image = ResizeProcessor.resample(image.extractCenter(size, size), 16, 16);
 
         return image.normalise();
@@ -59,43 +63,37 @@ class Annotator1 extends BatchAnnotator<FImage, String> {
 
     @Override
     public List<ScoredAnnotation<String>> annotate(FImage image) {
-        List<IntFloatPair> nearest = this.knn.searchKNN(flattenImage(makeTiny(image)), 10);
+        List<IntFloatPair> nearest = this.knn.searchKNN(flattenImage(makeTiny(image)), this.k);
         List<ScoredAnnotation<String>> result = new ArrayList<ScoredAnnotation<String>>(1);
+
         nearest.stream()
                 .map(e -> trainingAnnotations[e.getFirst()])
                 .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()))
                 .entrySet()
                 .stream()
                 .max(Map.Entry.comparingByValue())
-                .ifPresent(e -> result.add(new ScoredAnnotation<String>(e.getKey(), (float) e.getValue() / 15)));
+                .ifPresent(e -> result.add(new ScoredAnnotation<String>(e.getKey(), (float) e.getValue() / this.k)));
+
         return result;
     }
 
     @Override
     public void train(GroupedDataset<String, ? extends ListDataset<FImage>, FImage> training) {
-
         this.annotations = training.getGroups();
         float[][] trainingData = new float[training.numInstances()][16*16];
         this.trainingAnnotations = new String[trainingData.length];
 
         int imageIndex = 0;
         for (String instance : training.getGroups()) {
-            System.out.println(instance);
             for (FImage image : training.get(instance)) {
                 trainingData[imageIndex] = flattenImage(makeTiny(image));
                 trainingAnnotations[imageIndex] = instance;
                 imageIndex++;
             }
-
         }
-
         this.knn = new FloatNearestNeighboursExact(trainingData);
-
-
     }
 
     @Override
-    public void train(List<? extends Annotated<FImage, String>> list) {
-
-    }
+    public void train(List<? extends Annotated<FImage, String>> list) { }
 }
