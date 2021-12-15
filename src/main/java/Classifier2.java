@@ -4,7 +4,6 @@ import org.openimaj.data.dataset.ListDataset;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.experiment.dataset.sampling.GroupedUniformRandomisedSampler;
 import org.openimaj.experiment.evaluation.classification.ClassificationEvaluator;
-import org.openimaj.experiment.evaluation.classification.ClassificationResult;
 import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMAnalyser;
 import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMResult;
 import org.openimaj.feature.FeatureExtractor;
@@ -13,66 +12,35 @@ import org.openimaj.feature.FloatFVComparison;
 import org.openimaj.feature.SparseIntFV;
 import org.openimaj.image.FImage;
 import org.openimaj.image.feature.local.aggregate.BagOfVisualWords;
+import org.openimaj.image.processing.algorithm.MeanCenter;
 import org.openimaj.ml.annotation.linear.LiblinearAnnotator;
 import org.openimaj.ml.clustering.FeatureVectorCentroidsResult;
 import org.openimaj.ml.clustering.assignment.HardAssigner;
 import org.openimaj.ml.clustering.kmeans.FeatureVectorKMeans;
 import org.openimaj.util.pair.IntFloatPair;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
-public class Classifier2 {
-    private final VFSGroupDataset<FImage> training;
-    private final VFSGroupDataset<FImage> testing;
-
+public class Classifier2 extends Classifier {
     public Classifier2(VFSGroupDataset<FImage> training, VFSGroupDataset<FImage> testing) {
-        this.training = training;
-        this.testing = testing;
+        super(training, testing);
     }
 
-    public void run() throws Exception {
+    public void run() {
         System.out.println("Training the assigner from a sample of the training dataset...");
-        HardAssigner<FloatFV, float[], IntFloatPair> assigner2 = trainAssigner(GroupedUniformRandomisedSampler.sample(training, 50));
+        HardAssigner<FloatFV, float[], IntFloatPair> assigner2 = trainAssigner(GroupedUniformRandomisedSampler.sample(getTraining(), 50));
 
         System.out.println("Setting up the extractor and classifier...");
         Extractor2 extractor2 = new Extractor2(assigner2);
         LiblinearAnnotator<FImage, String> liblinearAnnotator = new LiblinearAnnotator<>(extractor2, LiblinearAnnotator.Mode.MULTICLASS, SolverType.L1R_L2LOSS_SVC, 1, 0.00001);
 
         System.out.println("Running the assigner on the training dataset...");
-        liblinearAnnotator.train(training);
+        liblinearAnnotator.train(getTraining());
 
         System.out.println("Running the classifier on the testing dataset...");
-        ClassificationEvaluator<CMResult<String>, String, FImage> evaluator2 = new ClassificationEvaluator<>(liblinearAnnotator, testing, new CMAnalyser<>(CMAnalyser.Strategy.SINGLE));
-        Map<FImage, ClassificationResult<String>> evaluation2 = evaluator2.evaluate();
-
-        System.out.println("Analysing the results of the classification...");
-        File files = new File(Paths.get("").toAbsolutePath() + "\\images\\testing\\testing");
-        ArrayList<String> fileNames = new ArrayList<>(List.of(Objects.requireNonNull(files.list())));
-        ArrayList<String> results = new ArrayList<>(); int count = 0;
-
-        for (FImage image : testing.get("testing")) {
-            for (Map.Entry<FImage, ClassificationResult<String>> evalEntry : evaluation2.entrySet()) {
-                if (evalEntry.getKey().equals(image)) {
-                    String fileName = fileNames.get(count); count++;
-                    String prediction = evalEntry.getValue().getPredictedClasses().toString();
-
-                    results.add(fileName + " " + prediction + "\n");
-                    break;
-                }
-            }
-        }
-        results.sort(Comparator.comparing(o -> Integer.parseInt(o.substring(0, o.indexOf(".jpg")))));
-
-        System.out.println("Printing the results of the classification...");
-        FileWriter fileWriter = new FileWriter(Paths.get("").toAbsolutePath() + "\\runs\\run2.txt");
-        for (String result : results) {
-            fileWriter.write(result);
-        }
-        fileWriter.close();
-        System.out.println("Classification has finished...");
+        ClassificationEvaluator<CMResult<String>, String, FImage> evaluator2 = new ClassificationEvaluator<>(liblinearAnnotator, getTesting(), new CMAnalyser<>(CMAnalyser.Strategy.SINGLE));
+        setEvaluation(evaluator2.evaluate());
     }
 
     // Extracts the features of an image to make a bag of visual words
@@ -108,9 +76,16 @@ public class Classifier2 {
     static ArrayList<FloatFV> extractPatchVectors(FImage image) {
         ArrayList<FloatFV> patchVectors = new ArrayList<>();
 
-        for (int i = 0; i < image.getWidth() - 4; i += 4) {
-            for (int j = 0; j < image.getHeight() - 4; j += 4) {
+        for (int i = 0; i < image.getHeight() - 4; i += 4) {
+            for (int j = 0; j < image.getWidth() - 4; j += 4) {
                 FImage patch = image.extractROI(i, j, 8, 8);
+                float mean = MeanCenter.patchMean(patch.pixels);
+
+                for (int m = 0; m < patch.getHeight(); m++) {
+                    for(int n = 0; n < patch.getWidth(); n++) {
+                        patch.pixels[m][n] = patch.pixels[m][n] - mean;
+                    }
+                }
                 patchVectors.add(new FloatFV(patch.normalise().getFloatPixelVector()));
             }
         }
