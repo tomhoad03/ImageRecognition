@@ -21,6 +21,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class Classifier1 extends BatchAnnotator<FImage, String> {
     private Set<String> annotations;
@@ -46,10 +49,15 @@ public class Classifier1 extends BatchAnnotator<FImage, String> {
 
     @Override
     public List<ScoredAnnotation<String>> annotate(FImage image) {
-        IntFloatPair nearest = this.knn.searchNN(flattenImage(makeTiny(image)));
+        List<IntFloatPair> nearest = this.knn.searchKNN(flattenImage(makeTiny(image)), 10);
         List<ScoredAnnotation<String>> result = new ArrayList<ScoredAnnotation<String>>(1);
-        result.add(new ScoredAnnotation<String>(this.trainingAnnotations[nearest.getFirst()], 1f));
-        System.out.println(result);
+        nearest.stream()
+                .map(e -> trainingAnnotations[e.getFirst()])
+                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()))
+                .entrySet()
+                .stream()
+                .max(Map.Entry.comparingByValue())
+                .ifPresent(e -> result.add(new ScoredAnnotation<String>(e.getKey(), (float) e.getValue() / 15)));
         return result;
     }
 
