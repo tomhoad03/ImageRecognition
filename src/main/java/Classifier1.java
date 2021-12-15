@@ -25,11 +25,14 @@ public class Classifier1 extends Classifier {
 
     public Classifier1(VFSGroupDataset<FImage> training, VFSGroupDataset<FImage> testing) {
         super(training, testing);
-        this.annotator1 = new Annotator1(10);
+        this.annotator1 = new Annotator1(50);
     }
 
     public void run() {
+        System.out.println("Running the annotator on the training dataset...");
         annotator1.train(getTraining());
+
+        System.out.println("Running the classifier on the testing dataset...");
         ClassificationEvaluator<CMResult<String>, String, FImage> evaluator = new ClassificationEvaluator<>(annotator1, getTesting(), new CMAnalyser<>(CMAnalyser.Strategy.SINGLE));
         setEvaluation(evaluator.evaluate());
     }
