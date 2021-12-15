@@ -38,7 +38,7 @@ public class ImageRecognition {
                     String fileName = fileNames.get(count); count++;
                     String prediction = evalEntry.getValue().getPredictedClasses().toString();
 
-                    results.add(fileName + " " + prediction + "\n");
+                    results.add(fileName + " " + prediction.substring(1, prediction.length() - 1) + "\n");
                     break;
                 }
             }
