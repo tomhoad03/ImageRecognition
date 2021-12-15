@@ -1,13 +1,6 @@
-import com.android.dx.rop.annotation.AnnotationsList;
 import org.openimaj.data.dataset.GroupedDataset;
 import org.openimaj.data.dataset.ListDataset;
-import org.openimaj.data.dataset.VFSGroupDataset;
-import org.openimaj.data.dataset.VFSListDataset;
-import org.openimaj.experiment.evaluation.classification.ClassificationEvaluator;
-import org.openimaj.experiment.evaluation.classification.ClassificationResult;
-import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMAnalyser;
-import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMResult;
-import org.openimaj.image.DisplayUtilities;
+
 import org.openimaj.image.FImage;
 import org.openimaj.image.processing.resize.ResizeProcessor;
 import org.openimaj.knn.FloatNearestNeighboursExact;
@@ -23,7 +16,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class Classifier1 extends BatchAnnotator<FImage, String> {
     private Set<String> annotations;
