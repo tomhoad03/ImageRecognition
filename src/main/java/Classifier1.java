@@ -25,7 +25,7 @@ public class Classifier1 extends Classifier {
 
     public Classifier1(VFSGroupDataset<FImage> training, VFSGroupDataset<FImage> testing) {
         super(training, testing);
-        this.annotator1 = new Annotator1(50);
+        this.annotator1 = new Annotator1(10);
     }
 
     public void run() {
